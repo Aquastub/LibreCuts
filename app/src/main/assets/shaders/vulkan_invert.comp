@@ -1,0 +1,21 @@
+#version 450
+// Compile with: glslangValidator -V vulkan_invert.comp -o vulkan_invert.spv
+// LibreCuts compute ABI: set 0 binding 0=input ARGB uints, binding 1=output ARGB uints.
+// Push constants are width and height. Workgroup size is fixed at 8x8x1.
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(set = 0, binding = 0, std430) readonly buffer InputPixels { uint pixels[]; } src;
+layout(set = 0, binding = 1, std430) writeonly buffer OutputPixels { uint pixels[]; } dst;
+layout(push_constant) uniform Dimensions { uint width; uint height; } dimensions;
+
+void main() {
+    uvec2 position = gl_GlobalInvocationID.xy;
+    if (position.x >= dimensions.width || position.y >= dimensions.height) return;
+    uint index = position.y * dimensions.width + position.x;
+    uint color = src.pixels[index]; // 0xAARRGGBB
+    uint alpha = (color >> 24) & 0xffu;
+    uint red = (color >> 16) & 0xffu;
+    uint green = (color >> 8) & 0xffu;
+    uint blue = color & 0xffu;
+    dst.pixels[index] = (alpha << 24) | ((255u - red) << 16) |
+                        ((255u - green) << 8) | (255u - blue);
+}

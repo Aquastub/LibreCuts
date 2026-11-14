@@ -32,6 +32,18 @@
             android:orientation="horizontal" />
     </HorizontalScrollView>
 
+    <Button
+        android:id="@+id/btnImportShaderPack"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="8dp"
+        android:text="Import RetroArch shader pack"
+        android:textColor="@color/colorPrimary"
+        app:strokeColor="@color/colorPrimary"
+        app:strokeWidth="1.5dp" />
+
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
