@@ -558,6 +558,40 @@ class VideoEditingViewModel : ViewModel() {
                         stageIndex++
                     }
                 }
+                is EditOperation.EffectRegion -> {
+                    // FFmpeg fallback renderer. Vulkan frame processing is not part of the
+                    // published FFmpegKit binary; keep export deterministic on all devices.
+                    val base = "[fx_base_$stageIndex]"
+                    val roi = "[fx_roi_$stageIndex]"
+                    val original = "[fx_original_$stageIndex]"
+                    val filtered = "[fx_filtered_$stageIndex]"
+                    val processed = "[fx_processed_$stageIndex]"
+                    val mixed = "[fx_mixed_$stageIndex]"
+                    val next = "[v$stageIndex]"
+                    val x = op.relativeX.coerceIn(0f, 0.98f)
+                    val y = op.relativeY.coerceIn(0f, 0.98f)
+                    val w = op.relativeWidth.coerceIn(0.02f, 1f - x)
+                    val h = op.relativeHeight.coerceIn(0.02f, 1f - y)
+                    val crop = "crop=w='max(2,trunc(iw*$w/2)*2)':h='max(2,trunc(ih*$h/2)*2)':x='trunc(iw*$x/2)*2':y='trunc(ih*$y/2)*2'"
+                    val filter = when (op.effect) {
+                        "invert" -> "negate"
+                        "grayscale" -> "hue=s=0"
+                        "sepia" -> "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131"
+                        "blur" -> "boxblur=12:8"
+                        "brighten" -> "eq=brightness=0.35"
+                        "sharpen" -> "unsharp=5:5:2:5:5:0"
+                        else -> "null"
+                    }
+                    val amount = op.intensity.coerceIn(0f, 1f)
+                    val enable = buildEnableExpr(op.startTimeMs, op.endTimeMs)
+                    stages.add("$currentLabel" + "split=2$base$roi")
+                    stages.add("$roi$crop,split=2$original$filtered")
+                    stages.add("$filtered$filter$processed")
+                    stages.add("$original$processed" + "blend=all_expr='A*(1-$amount)+B*$amount'$mixed")
+                    stages.add("$base$mixed" + "overlay=x='W*$x':y='H*$y':shortest=1$enable$next")
+                    currentLabel = next
+                    stageIndex++
+                }
                 is EditOperation.AddSubtitles -> {
                     val effectiveDensity = if (density > 0.5f) density else 2.75f
                     val refHeight = if (sourceVideoHeight > 0) sourceVideoHeight.toFloat() else 1080f
@@ -718,7 +752,7 @@ class VideoEditingViewModel : ViewModel() {
         val trimOp = operations.filterIsInstance<EditOperation.Trim>().lastOrNull()
         val audioOps = operations.filterIsInstance<EditOperation.AddBackgroundAudio>()
         val audioMuted = operations.any { it is EditOperation.MuteAudio }
-        val videoOps = nonMergeOps.filter { it is EditOperation.Crop || it is EditOperation.AddText || it is EditOperation.AddImageOverlay || it is EditOperation.AddSubtitles }
+        val videoOps = nonMergeOps.filter { it is EditOperation.Crop || it is EditOperation.AddText || it is EditOperation.AddImageOverlay || it is EditOperation.AddSubtitles || it is EditOperation.EffectRegion }
         val imageOps = operations.filterIsInstance<EditOperation.AddImageOverlay>()
 
         // ── Unified Input Indexing ────────────────────────────────────────────
@@ -1606,7 +1640,7 @@ class VideoEditingViewModel : ViewModel() {
             return null // No visual operations to preview
         }
 
-        val videoOps = operations.filter { it is EditOperation.Crop || it is EditOperation.AddText || it is EditOperation.AddSubtitles }
+        val videoOps = operations.filter { it is EditOperation.Crop || it is EditOperation.AddText || it is EditOperation.AddSubtitles || it is EditOperation.EffectRegion }
         val trimOp = operations.filterIsInstance<EditOperation.Trim>().lastOrNull()
 
         val cmd = StringBuilder()

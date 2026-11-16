@@ -63,7 +63,6 @@ Help resist this gatekeeping and support the movement at [keepandroidopen.org](h
 - **Transition** - Apply transitions with animated visual previews in the toolbar.
 - **Speed** - Change the speed of a video clip using a custom speed slider for granular control.
 - **Adjust & Filters** - Modify video brightness, contrast, saturation, and apply color filters.
-- **Shader Pack Import (Experimental)** - Import RetroArch Slang shader bundles (`.zip`, `.slang`, `.slangp`) and GLSL shader files into a private app library for inspection. Shader execution and Vulkan rendering are not enabled yet.
 - **Canvas Background** - Add a blurred background or a solid color for a cohesive look when your video aspect ratio does not match the project frame.
 - **Reverse** - Reverse video playback.
 - **Timeline Organization** - Enhanced editing with snapping functionality, overlay duplication, freeze frame actions, and improved UI visual styling.
@@ -159,13 +158,10 @@ Contributions are welcome! If you have suggestions or improvements, feel free to
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-### Experimental shader-pack import
+## Region effect export integration
 
-Open the existing **Adjust & Filters** panel and choose **Import RetroArch shader pack**. LibreCuts can store individual `.slang`, `.slangp`, `.glsl`, and `.glslp` files, or unpack ZIP shader bundles (including relative shader and texture assets), into its private app storage. The current implementation parses basic `.slangp` pass metadata and detects the device's reported Vulkan hardware feature. It does **not** compile shaders, execute RetroArch Slang passes, apply Vulkan effects to the live preview, or render them into exports yet.
+`EditOperation.EffectRegion` is now part of the project operation model and JSON serializer. The consolidated FFmpeg export graph recognizes the operation and applies its selected built-in effect to a normalized rectangular crop, blends the processed crop with the original according to intensity, and composites it back at the same location. Optional start/end times gate the region overlay. The software FFmpeg path is the compatibility fallback.
 
+### Vulkan integration status
 
-## Vulkan effects runtime (experimental)
-
-LibreCuts includes an experimental Android NDK Vulkan runtime under `app/src/main/cpp` and `shaders/VulkanShaderRuntime.kt`. It creates a Vulkan instance, selects a physical device with a compute-capable queue, creates a logical device, and exposes the selected GPU name to the editor's shader-pack import report. The native runtime is optional: devices without Vulkan or builds without the native library continue to use the existing preview/export paths.
-
-Shader packs remain stored in the app-private shader library. The native runtime can execute compatible precompiled `.spv` compute modules against ARGB bitmap frames. Its compute-shader ABI is set 0/binding 0 (read-only `uint` pixel buffer), set 0/binding 1 (write-only `uint` pixel buffer), 8×8×1 workgroups, and two 32-bit push constants (`width`, `height`). Each shader invocation must bounds-check its global pixel coordinate. **This version does not yet compile RetroArch Slang source, connect ExoPlayer's live surface to Vulkan, or apply custom shaders during FFmpeg export.** Those require the Slang/glslang compiler integration, zero-copy Vulkan image/surface interop, and an export filter bridge.
+The current app dependency is the prebuilt `com.antonkarpenko:ffmpeg-kit-full-gpl` package. That binary is not built by this project and does not expose a LibreCuts Vulkan frame-filter callback. Therefore this change does **not** claim to run Vulkan compute shaders inside ExoPlayer playback or FFmpeg export. A real GPU connection requires replacing/rebuilding the FFmpegKit native binaries with Vulkan-enabled FFmpeg (and a custom filter or frame bridge), then routing decoded frames through that filter. The present export graph remains the reliable CPU fallback until that native integration is supplied.

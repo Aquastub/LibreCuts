@@ -373,6 +373,30 @@ sealed class EditOperation : Serializable {
      * Adjust operation: Adjusts video properties for a specific clip index.
      * All properties range from -100 to 100, default is 0.
      */
+    /** A filter applied only inside a normalized rectangle of the source video. */
+    data class EffectRegion(
+        val effect: String = "invert",
+        val relativeX: Float = 0.25f,
+        val relativeY: Float = 0.25f,
+        val relativeWidth: Float = 0.5f,
+        val relativeHeight: Float = 0.5f,
+        val intensity: Float = 1f,
+        val startTimeMs: Long? = null,
+        val endTimeMs: Long? = null,
+        val id: String = System.nanoTime().toString()
+    ) : EditOperation() {
+        init {
+            require(effect in setOf("invert", "grayscale", "sepia", "blur", "brighten", "sharpen"))
+            require(relativeX in 0f..1f && relativeY in 0f..1f)
+            require(relativeWidth in 0.02f..1f && relativeHeight in 0.02f..1f)
+            require(relativeX + relativeWidth <= 1.001f && relativeY + relativeHeight <= 1.001f)
+            require(intensity in 0f..1f)
+            require(startTimeMs == null || startTimeMs >= 0L)
+            require(endTimeMs == null || endTimeMs >= 0L)
+            require(startTimeMs == null || endTimeMs == null || endTimeMs > startTimeMs)
+        }
+    }
+
     data class Adjust(
         val index: Int,
         val brightness: Int = 0,

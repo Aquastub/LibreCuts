@@ -508,61 +508,6 @@ class VideoEditingActivity : AppCompatActivity() {
 
     private var activeFontSelectionCallback: ((com.tharunbirla.librecuts.utils.FontItem) -> Unit)? = null
 
-    private val shaderLibrary by lazy { com.tharunbirla.librecuts.shaders.ShaderLibrary(this) }
-
-    private val importShaderPackLauncher = registerForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            lifecycleScope.launch {
-                try {
-                    val result = withContext(Dispatchers.IO) {
-                        val displayName = contentResolver.query(
-                            uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null
-                        )?.use { cursor ->
-                            if (cursor.moveToFirst()) cursor.getString(0) else null
-                        } ?: "shader-pack"
-                        shaderLibrary.importUri(this@VideoEditingActivity, uri, displayName)
-                    }
-                    val presetDetails = result.presets.mapNotNull { presetFile ->
-                        runCatching {
-                            val parsed = com.tharunbirla.librecuts.shaders.RetroArchSlangPresetParser
-                                .parsePreset(presetFile.readText(), presetFile.nameWithoutExtension)
-                            "${parsed.title}: ${parsed.passCount} shader pass(es)"
-                        }.getOrNull()
-                    }
-                    val vulkan = com.tharunbirla.librecuts.shaders.VulkanDeviceSupport.inspect(this@VideoEditingActivity)
-                    val nativeRuntime = withContext(Dispatchers.IO) {
-                        com.tharunbirla.librecuts.shaders.VulkanShaderRuntime.create(this@VideoEditingActivity)
-                    }
-                    val nativeDevice = nativeRuntime?.deviceInfo
-                    nativeRuntime?.close()
-                    val message = buildString {
-                        append("Imported ${result.files.size} file(s) into the private shader library.")
-                        if (presetDetails.isNotEmpty()) {
-                            append("\n\n")
-                            append(presetDetails.joinToString("\n"))
-                        }
-                        append("\n\nVulkan hardware feature: ")
-                        append(if (vulkan.isAvailable) "available" else "not reported by this device")
-                        append("\nNative Vulkan compute device: ")
-                        append(nativeDevice?.name ?: "unavailable")
-                        append("\n\nThe native Vulkan instance, logical device and compute queue initialized successfully.")
-                        append("\nSlang-to-SPIR-V compilation, shader pipelines, live preview and export execution are the next integration stage.")
-                    }
-                    MaterialAlertDialogBuilder(this@VideoEditingActivity)
-                        .setTitle("Shader pack imported")
-                        .setMessage(message)
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show()
-                } catch (error: Exception) {
-                    Log.e(TAG, "Shader pack import failed", error)
-                    Toast.makeText(this@VideoEditingActivity, "Shader import failed: ${error.message}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
-
     private val importFontLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -6844,9 +6789,6 @@ class VideoEditingActivity : AppCompatActivity() {
         bottomSheet.setContentView(view)
 
         val filtersList = view.findViewById<LinearLayout>(R.id.colorFiltersList)
-        view.findViewById<View>(R.id.btnImportShaderPack)?.setOnClickListener {
-            importShaderPackLauncher.launch(arrayOf("application/zip", "application/octet-stream", "text/plain", "*/*"))
-        }
         val project = viewModel.project.value ?: return
         val existingOp = project.operations.filterIsInstance<com.tharunbirla.librecuts.models.EditOperation.ColorFilter>().find { it.index == clipIndex }
         var activeFilterName = existingOp?.filterName ?: "none"
